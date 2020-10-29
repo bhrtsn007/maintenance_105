@@ -244,7 +244,7 @@ echo ""
 sudo /opt/butler_server/bin/butler_server rpcterms ets i > /home/gor/easy_console/"$DIRECTORY"_mnesia_table_raw_data.txt
 awk 'BEGIN{print "id,name,type,size,mem,owner"}{print $1","$2","$3","$4","$5","$6}' /home/gor/easy_console/"$DIRECTORY"_mnesia_table_raw_data.txt > /home/gor/easy_console/"$DIRECTORY"_mnesia_table.csv
 
-echo "Please check" "$DIRECTORY""_mnesia_table.csv in /home/gor/easy_console/maintenance"
+echo "Please check" "$DIRECTORY""_mnesia_table.csv in /home/gor/easy_console/"
 
 
 echo "####################################################"
