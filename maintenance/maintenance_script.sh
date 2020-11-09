@@ -151,9 +151,7 @@ echo "####################################################"
 
 if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
 	echo "Data sanity & Data domain validation check is true, Restarting Butler server is safe"
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server stop
-	sleep 0.5
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server start
+	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server restart
 	
 	#Sleep for atleast 15 min
 	echo "Going for sleep for 15 minutes"
