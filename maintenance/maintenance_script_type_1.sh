@@ -154,13 +154,84 @@ echo "####################################################"
 echo "Restarting Butler Server"
 echo "####################################################"
 
+#if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
+#	echo "Data sanity is true, Restarting Butler server is safe"
+#	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server restart
+#	
+#	#Sleep for atleast 15 min
+#	echo "Going for sleep for 10 minutes"
+#	runtime="10 minute"														#Change to 10 minutes from 15 minutes
+#	endtime=$(date -ud "$runtime" +%s)
+#	
+#	while [[ $(date -u +%s) -le $endtime ]]
+#	do
+#	    echo -n "Time Now: `date +%H:%M:%S`"
+#	    echo -n "  I am still Awake counting 10 minutes"
+#	    echo ""
+#	    sleep 10
+#	done
+#	
+#	echo "####################################################"
+#	echo "Butler Server Status"
+#	echo "####################################################"
+#	
+#	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server status | cat
+#
+#else
+#	echo "Data sanity is FALSE, SKIPPING Butler Server Restart"
+#fi
+
 if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
 	echo "Data sanity is true, Restarting Butler server is safe"
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server restart
-	
+	echo ""
+	echo "Stopping Butler server"
+	echo "$PASSWORD_OF_CORE" | sudo -S systemctl stop butler_server.service
+	echo "Checking active PID"
+	sleep 20
+	pid_check_1=`pgrep -af "butler_server -mode"`
+	echo "PID found: $pid_check_1"
+	if [ ! -n "$pid_check_1" ]; then
+		echo "Server Stop successfully, starting butler_server application"
+		echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+		sleep 5
+		echo "Restart complete"
+	else
+		echo "Server not stopped properly, trying to kill active PID"
+		sudo pkill -f "butler_server -mode"
+		echo "Checking active PID again"
+		sleep 20
+		pid_check_2=`pgrep -af "butler_server -mode"`
+		echo "PID found: $pid_check_2"
+		if [ ! -n "$pid_check_2" ]; then
+			echo "Server stop successfully after clearing PID, starting butler_server application"
+			echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+	        sleep 5
+			echo "Restart complete"
+		else
+			echo "Server not stopped after killing PID, killing butler_server PID forcefully"
+			sudo pkill -9 -f "butler_server -mode"
+			sleep 20
+			echo "forcefull kill complete, Checking active PID again"
+			pid_check_3=`pgrep -af "butler_server -mode"`
+			echo "PID found: $pid_check_3"
+			if [ ! -n "$pid_check_3" ]; then
+				echo "Server stop successfully after clearing PID forcefully, starting butler_server application"
+				echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+				sleep 5
+				echo "Restart complete"
+			else
+				echo "Something still wrong, check all PID which are active and then start butler_server application manually"
+			fi
+		fi
+		
+	fi
+	echo "####################################################"
+	echo "Check logs for Butler server status"
+	echo "####################################################"
+	echo ""
 	#Sleep for atleast 15 min
 	echo "Going for sleep for 10 minutes"
-	runtime="10 minute"														#Change to 10 minutes from 15 minutes
+	runtime="10 minute"
 	endtime=$(date -ud "$runtime" +%s)
 	
 	while [[ $(date -u +%s) -le $endtime ]]
@@ -175,11 +246,16 @@ if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
 	echo "Butler Server Status"
 	echo "####################################################"
 	
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server status | cat
+	echo "$PASSWORD_OF_CORE" | sudo -S systemctl status butler_server.service | cat
 
+	echo "####################################################"
+	echo "Also Run After Butler Server Restart Script"
+	echo "####################################################"
 else
 	echo "Data sanity is FALSE, SKIPPING Butler Server Restart"
 fi
+
+
 
 echo "####################################################"
 echo "Data Sanity and Node check after Butler Server restart"

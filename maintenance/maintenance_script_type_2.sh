@@ -25,59 +25,6 @@ echo "####################################################"
 #echo "Syncing Inventory on Core Server"
 #sudo /opt/butler_server/erts-9.3.3.6/bin/escript /home/gor/easy_console/maintenance/sync_inventory.escript
 
-echo "Starting Tmux session for archiving Postgres on Platform DB"
-
-tmux new-session -d -s platform_srms "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_platform_srms.py 30'"
-tmux new-session -d -s wms_process "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_process.py 30'"
-tmux new-session -d -s wms_notification "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_notification.py 30'"
-
-#Need to execute below code when all above three tmux session has been completed
-session_1="platform_srms"
-session_2="wms_process"
-session_3="wms_notification"
-srms=false
-process=false
-notification=false
-
-while [ "$srms" == false ] || [ "$process" == false ] || [ "$notification" == false ] 
-do
-	# Check if the session exists, discarding output
-	# We can check $? for the exit status (zero for success, non-zero for failure)
-	sleep 0.1
-	tmux has-session -t $session_1 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  	echo "PLATFORM SRMS ARCHIVING COMPLETE"
-	  	srms=true
-	else
-		echo "platform_srms archiving is still running"
-	fi
-	sleep 0.1
-	tmux has-session -t $session_2 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  	echo "WMS PROCESS ARCHIVING COMPLETE"
-	  	process=true
-	else
-		echo "wms_process archiving is still running"
-	fi
-	sleep 0.1
-	tmux has-session -t $session_3 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  echo "WMS NOTIFICATION ARCHIVING COMPLETE"
-	  echo ""
-	  notification=true
-	else
-		echo "wms_notification archiving is still running"
-		echo ""
-	fi
-	sleep 2
-done
-
-echo "####################################################"
-echo "Platform DB Archiving COMPLETE"
-echo "####################################################"
 
 #echo "####################################################"
 #echo "Restarting Tower"
@@ -254,6 +201,61 @@ echo "Check Eureka Service Page for all Microservices"
 #echo "Please confirm by typing 'Yes' if not required Type 'No'"
 #read ans
 #echo "Answer provided: $ans"
+
+echo "Starting Tmux session for archiving Postgres on Platform DB"
+
+tmux new-session -d -s platform_srms "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_platform_srms.py 30'"
+tmux new-session -d -s wms_process "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_process.py 30'"
+tmux new-session -d -s wms_notification "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_notification.py 30'"
+
+#Need to execute below code when all above three tmux session has been completed
+session_1="platform_srms"
+session_2="wms_process"
+session_3="wms_notification"
+srms=false
+process=false
+notification=false
+
+while [ "$srms" == false ] || [ "$process" == false ] || [ "$notification" == false ] 
+do
+	# Check if the session exists, discarding output
+	# We can check $? for the exit status (zero for success, non-zero for failure)
+	sleep 0.1
+	tmux has-session -t $session_1 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  	echo "PLATFORM SRMS ARCHIVING COMPLETE"
+	  	srms=true
+	else
+		echo "platform_srms archiving is still running"
+	fi
+	sleep 0.1
+	tmux has-session -t $session_2 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  	echo "WMS PROCESS ARCHIVING COMPLETE"
+	  	process=true
+	else
+		echo "wms_process archiving is still running"
+	fi
+	sleep 0.1
+	tmux has-session -t $session_3 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  echo "WMS NOTIFICATION ARCHIVING COMPLETE"
+	  echo ""
+	  notification=true
+	else
+		echo "wms_notification archiving is still running"
+		echo ""
+	fi
+	sleep 2
+done
+
+echo "####################################################"
+echo "Platform DB Archiving COMPLETE"
+echo "####################################################"
+
 
 echo "####################################################"
 echo "MAINTENANCE Type 2 COMPLETE at $(date)"

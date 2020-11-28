@@ -23,60 +23,6 @@ echo "Data validate_all_tables is : " $data_domain
 echo "Syncing Inventory on Core Server"
 sudo /opt/butler_server/erts-9.3.3.6/bin/escript /home/gor/easy_console/maintenance/sync_inventory.escript
 
-echo "Starting Tmux session for archiving Postgres on Platform DB"
-#Possibility of having issue with "" which we face in tmux
-
-tmux new-session -d -s platform_srms "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_platform_srms.py 30'"
-tmux new-session -d -s wms_process "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_process.py 30'"
-tmux new-session -d -s wms_notification "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_notification.py 30'"
-
-#Need to execute below code when all above three tmux session has been completed
-session_1="platform_srms"
-session_2="wms_process"
-session_3="wms_notification"
-srms=false
-process=false
-notification=false
-
-while [ "$srms" == false ] || [ "$process" == false ] || [ "$notification" == false ] 
-do
-	# Check if the session exists, discarding output
-	# We can check $? for the exit status (zero for success, non-zero for failure)
-	sleep 0.1
-	tmux has-session -t $session_1 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  	echo "PLATFORM SRMS ARCHIVING COMPLETE"
-	  	srms=true
-	else
-		echo "platform_srms archiving is still running"
-	fi
-	sleep 0.1
-	tmux has-session -t $session_2 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  	echo "WMS PROCESS ARCHIVING COMPLETE"
-	  	process=true
-	else
-		echo "wms_process archiving is still running"
-	fi
-	sleep 0.1
-	tmux has-session -t $session_3 2>/dev/null
-	
-	if [ $? != 0 ]; then
-	  echo "WMS NOTIFICATION ARCHIVING COMPLETE"
-	  echo ""
-	  notification=true
-	else
-		echo "wms_notification archiving is still running"
-		echo ""
-	fi
-	sleep 2
-done
-
-echo "####################################################"
-echo "Platform DB Archiving COMPLETE"
-echo "####################################################"
 
 sleep 1
 
@@ -149,19 +95,90 @@ echo "####################################################"
 echo "Restarting Butler Server"
 echo "####################################################"
 
+#if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
+#	echo "Data sanity & Data domain validation check is true, Restarting Butler server is safe"
+#	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server restart
+#	
+#	#Sleep for atleast 15 min
+#	echo "Going for sleep for 15 minutes"
+#	runtime="15 minute"
+#	endtime=$(date -ud "$runtime" +%s)
+#	
+#	while [[ $(date -u +%s) -le $endtime ]]
+#	do
+#	    echo -n "Time Now: `date +%H:%M:%S`"
+#	    echo -n "  I am still Awake counting 15 minutes"
+#	    echo ""
+#	    sleep 10
+#	done
+#	
+#	echo "####################################################"
+#	echo "Butler Server Status"
+#	echo "####################################################"
+#	
+#	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server status | cat
+#
+#else
+#	echo "Data sanity or Data domain validation check is FALSE, SKIPPING Butler Server Restart"
+#fi
+
 if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
-	echo "Data sanity & Data domain validation check is true, Restarting Butler server is safe"
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server restart
-	
+	echo "Data sanity is true, Restarting Butler server is safe"
+	echo ""
+	echo "Stopping Butler server"
+	echo "$PASSWORD_OF_CORE" | sudo -S systemctl stop butler_server.service
+	echo "Checking active PID"
+	sleep 20
+	pid_check_1=`pgrep -af "butler_server -mode"`
+	echo "PID found: $pid_check_1"
+	if [ ! -n "$pid_check_1" ]; then
+		echo "Server Stop successfully, starting butler_server application"
+		echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+		sleep 5
+		echo "Restart complete"
+	else
+		echo "Server not stopped properly, trying to kill active PID"
+		sudo pkill -f "butler_server -mode"
+		echo "Checking active PID again"
+		sleep 20
+		pid_check_2=`pgrep -af "butler_server -mode"`
+		echo "PID found: $pid_check_2"
+		if [ ! -n "$pid_check_2" ]; then
+			echo "Server stop successfully after clearing PID, starting butler_server application"
+			echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+	        sleep 5
+			echo "Restart complete"
+		else
+			echo "Server not stopped after killing PID, killing butler_server PID forcefully"
+			sudo pkill -9 -f "butler_server -mode"
+			sleep 20
+			echo "forcefull kill complete, Checking active PID again"
+			pid_check_3=`pgrep -af "butler_server -mode"`
+			echo "PID found: $pid_check_3"
+			if [ ! -n "$pid_check_3" ]; then
+				echo "Server stop successfully after clearing PID forcefully, starting butler_server application"
+				echo "$PASSWORD_OF_CORE" | sudo -S systemctl start butler_server.service
+				sleep 5
+				echo "Restart complete"
+			else
+				echo "Something still wrong, check all PID which are active and then start butler_server application manually"
+			fi
+		fi
+		
+	fi
+	echo "####################################################"
+	echo "Check logs for Butler server status"
+	echo "####################################################"
+	echo ""
 	#Sleep for atleast 15 min
-	echo "Going for sleep for 15 minutes"
-	runtime="15 minute"
+	echo "Going for sleep for 10 minutes"
+	runtime="10 minute"
 	endtime=$(date -ud "$runtime" +%s)
 	
 	while [[ $(date -u +%s) -le $endtime ]]
 	do
 	    echo -n "Time Now: `date +%H:%M:%S`"
-	    echo -n "  I am still Awake counting 15 minutes"
+	    echo -n "  I am still Awake counting 10 minutes"
 	    echo ""
 	    sleep 10
 	done
@@ -170,11 +187,17 @@ if [ "$data_sanity" == "true" ] && [ "$data_domain" == "true" ]; then
 	echo "Butler Server Status"
 	echo "####################################################"
 	
-	echo "$PASSWORD_OF_CORE" | sudo -S service butler_server status | cat
+	echo "$PASSWORD_OF_CORE" | sudo -S systemctl status butler_server.service | cat
 
+	echo "####################################################"
+	echo "Also Run After Butler Server Restart Script"
+	echo "####################################################"
 else
-	echo "Data sanity or Data domain validation check is FALSE, SKIPPING Butler Server Restart"
+	echo "Data sanity is FALSE, SKIPPING Butler Server Restart"
 fi
+
+
+
 
 echo "####################################################"
 echo "Data Sanity and Node check after Butler Server restart"
@@ -249,6 +272,61 @@ echo "####################################################"
 echo "Please run script which need to run after butler server restart (if any)"
 echo "####################################################"
 echo ""
+
+echo "Starting Tmux session for archiving Postgres on Platform DB"
+#Possibility of having issue with "" which we face in tmux
+
+tmux new-session -d -s platform_srms "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_platform_srms.py 30'"
+tmux new-session -d -s wms_process "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_process.py 30'"
+tmux new-session -d -s wms_notification "sshpass -p '$PASSWORD_OF_PLATFORM_DB' ssh -o StrictHostKeyChecking=no -t gor@$PLATFORM_DB_IP 'echo '$PASSWORD_OF_PLATFORM_DB' | sudo -S python $PATH_OF_SCRIPT/delete_from_wms_notification.py 30'"
+
+#Need to execute below code when all above three tmux session has been completed
+session_1="platform_srms"
+session_2="wms_process"
+session_3="wms_notification"
+srms=false
+process=false
+notification=false
+
+while [ "$srms" == false ] || [ "$process" == false ] || [ "$notification" == false ] 
+do
+	# Check if the session exists, discarding output
+	# We can check $? for the exit status (zero for success, non-zero for failure)
+	sleep 0.1
+	tmux has-session -t $session_1 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  	echo "PLATFORM SRMS ARCHIVING COMPLETE"
+	  	srms=true
+	else
+		echo "platform_srms archiving is still running"
+	fi
+	sleep 0.1
+	tmux has-session -t $session_2 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  	echo "WMS PROCESS ARCHIVING COMPLETE"
+	  	process=true
+	else
+		echo "wms_process archiving is still running"
+	fi
+	sleep 0.1
+	tmux has-session -t $session_3 2>/dev/null
+	
+	if [ $? != 0 ]; then
+	  echo "WMS NOTIFICATION ARCHIVING COMPLETE"
+	  echo ""
+	  notification=true
+	else
+		echo "wms_notification archiving is still running"
+		echo ""
+	fi
+	sleep 2
+done
+
+echo "####################################################"
+echo "Platform DB Archiving COMPLETE"
+echo "####################################################"
 
 
 echo "####################################################"
